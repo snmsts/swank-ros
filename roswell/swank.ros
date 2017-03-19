@@ -4,7 +4,7 @@
 exec ros -Q -- $0 "$@"
 |#
 (progn ;;init forms
-  (ql:quickload :swank :silent t))
+  (ql:quickload '(:swank-ros) :silent t))
 
 (defpackage #:ros.script.roswell/swank.ros
   (:use #:cl))
