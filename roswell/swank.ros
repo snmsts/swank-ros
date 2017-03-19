@@ -49,33 +49,57 @@ exec ros -Q -- $0 "$@"
                   when name collect name)))))
 
 (defun main (&rest argv)
-  (in-package :cl-user)
-  (apply 'swank:create-server
-         (parse-argv (argv)
-           (:var port
-            :default 4005
-            :option ("-p" "--port")
-            :convert (parse-integer (pop argv) :junk-allowed t)
-            :description "port")
-           (:var interface
-            :default "127.0.0.1"
-            :option ("-i" "--interface")
-            :convert (pop argv)
-            :description "interface")
-           (:var style
-            :default nil
-            :option ("-s" "--style")
-            :convert (let ((s (pop argv)))
-                       (cond
-                         ((equal s "spawn") :spawn)
-                         ((equal s "sigio") :sigio)
-                         ((equal s "fd-handler") :fd-handler)
-                         ((equal s "nil") nil)
-                         ((equal s "default") swank:*communication-style*)))
-            :description "style")
-           (:var dont-close
-            :default t
-            :option ("-c" "--close")
-            :convert nil)))
-  (loop (sleep 10)))
+  (let* (system
+         (parsed (parse-argv (argv)
+                   (:var nil
+                    :option ("-s")
+                    :side-effect (setf system (pop argv))
+                    :description "system")
+                   (:var port
+                    :default 4005
+                    :option ("-p" "--port")
+                    :convert (parse-integer (pop argv) :junk-allowed t)
+                    :description "port")
+                   (:var interface
+                    :default "127.0.0.1"
+                    :option ("-i" "--interface")
+                    :convert (pop argv)
+                    :description "interface")
+                   (:var style
+                    :default nil
+                    :option ("-St" "--style")
+                    :convert (let ((s (pop argv)))
+                               (cond
+                                 ((equal s "spawn") :spawn)
+                                 ((equal s "sigio") :sigio)
+                                 ((equal s "fd-handler") :fd-handler)
+                                 ((equal s "nil") nil)
+                                 ((equal s "default") swank:*communication-style*)))
+                    :description "style")
+                   (:var dont-close
+                    :default t
+                    :option ("-c" "--close")
+                    :convert nil))))
+    (flet ((swank ()
+             (in-package :cl-user)
+             (apply 'swank:create-server parsed)
+             (loop (sleep 10))))
+      #-windows
+      (format *error-output* "server pid ~A~%" (daemon::getpid))
+      (loop
+         (when system
+           #-quicklisp (asdf:load-system system)
+           #+quicklisp (ql:quickload system))
+         #+windows (swank)
+         #-windows
+         (let ((pid (daemon::fork)))
+           (cond
+             ((= pid 0) ;; child
+              (loop (swank)))
+             ((plusp pid) ;; parent
+              (format *error-output* "swank pid ~A~%" pid)
+              (daemon::waitpid pid 0)
+              (format *error-output* "swank pid ~A killed~%" pid))
+             ((= pid -1)
+              (error "fork failure"))))))))
 ;;; vim: set ft=lisp lisp:
