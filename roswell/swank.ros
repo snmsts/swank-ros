@@ -14,15 +14,17 @@ exec ros -Q -- $0 "$@"
   (let ((i (gensym)))
     `(let ,(cons
             (list argv argv)
-            (mapcar (lambda (x)
-                      `(,(getf x :var) ,(getf x :default)))
-                    options))
+            (loop for x in options
+               when (getf x :var)
+               collect `(,(getf x :var) ,(getf x :default))))
        (loop while ,argv
              for ,i = (pop ,argv)
              unless (cond
                       ,@(loop for x in options
                               collect `((member ,i ',(getf x :option) :test 'equal)
-                                        (setf ,(getf x :var) ,(getf x :convert))
+                                        ,(if (getf x :var)
+                                             `(setf ,(getf x :var) ,(getf x :convert))
+                                             `(progn ,(getf x :side-effect)))
                                         t))
                       ((equal ,i "--help")
                        (format *error-output* "~&~A~%"
@@ -40,8 +42,8 @@ exec ros -Q -- $0 "$@"
        ,`(list
           ,@(loop for x in options
                   for name = (getf x :var)
-                  collect (intern (string name) :keyword)
-                  collect name)))))
+                  when name collect (intern (string name) :keyword)
+                  when name collect name)))))
 
 (defun main (&rest argv)
   (in-package :cl-user)
