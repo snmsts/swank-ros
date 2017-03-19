@@ -32,9 +32,12 @@ exec ros -Q -- $0 "$@"
                                         "usage: ~A ~{~A~^ ~}"
                                         (ignore-errors (file-namestring *load-pathname*))
                                         (mapcar (lambda(x)
-                                                  (format nil "[~A <~A>]"
-                                                          (first (getf x :option))
-                                                          (getf x :description)))
+                                                  (if (getf x :description)
+                                                      (format nil "[~A <~A>]"
+                                                              (first (getf x :option))
+                                                              (getf x :description))
+                                                      (format nil "[~A]"
+                                                              (first (getf x :option)))))
                                                 options)))
                        (uiop:quit 0)))
                do (format *error-output* "~&Invalid argument: ~S~%" ,i)
@@ -69,6 +72,10 @@ exec ros -Q -- $0 "$@"
                          ((equal s "fd-handler") :fd-handler)
                          ((equal s "nil") nil)
                          ((equal s "default") swank:*communication-style*)))
-            :description "style")))
+            :description "style")
+           (:var dont-close
+            :default t
+            :option ("-c" "--close")
+            :convert nil)))
   (loop (sleep 10)))
 ;;; vim: set ft=lisp lisp:
